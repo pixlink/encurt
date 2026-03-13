@@ -15,9 +15,11 @@
     button { padding: 10px 14px; border-radius: 8px; border:1px solid #111; background:#fff; cursor:pointer; font-weight:700; }
     button.primary { background:#111; color:#fff; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
-    .hint { color:#666; font-size: 13px; margin-top: 10px; }
+    .hint { color:#666; font-size: 13px; margin-top: 10px; line-height: 1.35; }
     .out { margin-top: 18px; }
-    .status { margin-top: 10px; font-size: 13px; color:#666; }
+    .status { margin-top: 10px; font-size: 13px; color:#666; white-space: pre-wrap; }
+    .small { font-size: 12px; color: #666; margin-top: 8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
 <body>
@@ -31,19 +33,27 @@
     <input id="pedido" type="text" placeholder="Ex: 2107551226..." />
 
     <div class="row">
-      <button id="gerar" class="primary">Gerar link encurtado</button>
+      <button id="gerar" class="primary">Gerar link encurtado (v.gd)</button>
       <button id="copiar" disabled>Copiar link</button>
       <button id="abrir" disabled>Abrir link</button>
     </div>
 
     <div class="hint">
-      O link encurtado será gerado pelo Cloudflare Worker e vai abrir a página com o QR Code e o botão para copiar o Pix.
+      Este modo usa apenas o <b>v.gd</b> (sem Cloudflare).<br/>
+      Observação: o v.gd pode mostrar uma página de aviso antes de redirecionar — isso é controlado pelo próprio v.gd.
     </div>
 
     <div class="out">
       <label for="link">Link gerado:</label>
-      <input id="link" readonly placeholder="O link aparecerá aqui..." />
+      <input id="link" class="mono" readonly placeholder="O link aparecerá aqui..." />
       <div id="status" class="status"></div>
+
+      <details class="small" style="margin-top:12px;">
+        <summary>Ver URL de destino (antes de encurtar)</summary>
+        <div style="margin-top:8px;">
+          <input id="destino" class="mono" readonly placeholder="Destino aparecerá aqui..." />
+        </div>
+      </details>
     </div>
   </div>
 
@@ -51,6 +61,7 @@
     const pixEl = document.getElementById("pix");
     const pedidoEl = document.getElementById("pedido");
     const linkEl = document.getElementById("link");
+    const destinoEl = document.getElementById("destino");
 
     const gerarBtn = document.getElementById("gerar");
     const copiarBtn = document.getElementById("copiar");
@@ -58,8 +69,8 @@
 
     const statusEl = document.getElementById("status");
 
-    // URL do seu Cloudflare Worker (sem barra no final)
-    const WORKER_BASE = "https://encurt.pixlink111.workers.dev";
+    // Página final (seu site)
+    const PIX_PAGE = "https://pixlink.github.io/encurt/pix.html";
 
     function setStatus(msg) {
       statusEl.textContent = msg || "";
@@ -70,8 +81,42 @@
       abrirBtn.disabled = !enabled;
     }
 
+    function normalizePix(pix) {
+      // remove \r e trim (não mexe no conteúdo do EMV além disso)
+      return (pix || "").toString().replace(/\r/g, "").trim();
+    }
+
+    function buildTargetUrl({ pix, pedido }) {
+      const pedidoClean = (pedido || "").toString().trim();
+      const pedidoPart = pedidoClean ? `?pedido=${encodeURIComponent(pedidoClean)}` : "";
+      // pix vai no fragmento (#) como você já usa
+      return `${PIX_PAGE}${pedidoPart}#${encodeURIComponent(pix)}`;
+    }
+
+    async function shortenWithVgd(longUrl) {
+      // API "simple" do v.gd: devolve texto puro com a URL encurtada
+      const api = "https://v.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl);
+
+      // Observação: isso é cross-origin; geralmente funciona porque v.gd libera.
+      const resp = await fetch(api, { method: "GET" });
+
+      const text = (await resp.text()).trim();
+
+      if (!resp.ok) {
+        // às vezes eles retornam 200 com erro em texto, então tratamos nos dois jeitos
+        throw new Error(text || `HTTP ${resp.status}`);
+      }
+
+      if (text.startsWith("https://v.gd/") || text.startsWith("http://v.gd/")) {
+        return text;
+      }
+
+      // quando dá erro, ele costuma devolver uma mensagem em texto
+      throw new Error(text || "Resposta inesperada do v.gd");
+    }
+
     gerarBtn.addEventListener("click", async () => {
-      const pix = (pixEl.value || "").replace(/\r/g, "").trim();
+      const pix = normalizePix(pixEl.value);
       const pedido = (pedidoEl.value || "").trim();
 
       if (!pix) {
@@ -81,39 +126,26 @@
 
       setButtonsEnabled(false);
       linkEl.value = "";
-      setStatus("Gerando link...");
+      destinoEl.value = "";
+      setStatus("Montando URL de destino...");
 
-      let resp;
+      const targetUrl = buildTargetUrl({ pix, pedido });
+      destinoEl.value = targetUrl;
+
+      setStatus("Encurtando no v.gd...");
+      gerarBtn.disabled = true;
+
       try {
-        resp = await fetch(WORKER_BASE + "/api/shorten", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pix, pedido }),
-        });
-      } catch {
-        setStatus("");
-        alert("Não consegui conectar no encurtador (Worker).");
-        return;
+        const shortUrl = await shortenWithVgd(targetUrl);
+        linkEl.value = shortUrl;
+        setButtonsEnabled(true);
+        setStatus("Link encurtado gerado.");
+      } catch (e) {
+        setStatus("Falha ao encurtar no v.gd.\n\nDetalhe: " + (e?.message || e));
+        alert("Não consegui encurtar no v.gd. Veja o detalhe abaixo do campo.");
+      } finally {
+        gerarBtn.disabled = false;
       }
-
-      let data;
-      try {
-        data = await resp.json();
-      } catch {
-        setStatus("");
-        alert("O Worker não retornou JSON. Veja o console (F12).");
-        return;
-      }
-
-      if (!data.ok) {
-        setStatus("");
-        alert("Erro: " + (data.error || "falha ao encurtar"));
-        return;
-      }
-
-      linkEl.value = data.shortUrl;
-      setButtonsEnabled(true);
-      setStatus("Link encurtado gerado.");
     });
 
     copiarBtn.addEventListener("click", async () => {
@@ -134,5 +166,6 @@
   </script>
 </body>
 </html>
+
 
 
