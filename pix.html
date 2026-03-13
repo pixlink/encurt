@@ -6,7 +6,8 @@
   <title>Pix - QR Code</title>
   <style>
     body { font-family: system-ui, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; text-align: center; }
-    #qrcode { display: inline-block; padding: 14px; background: #fff; border: 1px solid #eee; border-radius: 12px; min-width: 256px; min-height: 256px; }
+    #qrcode { display: inline-block; padding: 14px; background: #fff; border: 1px solid #eee; border-radius: 12px; }
+    #qrImg { width: 256px; height: 256px; display:block; }
     #pedidoBox { margin-top: 14px; font-size: 16px; font-weight: 600; }
     button { margin-top: 16px; padding: 12px 16px; font-size: 15px; cursor: pointer; }
     .box { margin-top: 18px; text-align: left; background: #f7f7f7; padding: 12px; border-radius: 10px; overflow-wrap: anywhere; }
@@ -16,7 +17,9 @@
 <body>
   <h1>Pagamento via Pix</h1>
 
-  <div id="qrcode"></div>
+  <div id="qrcode">
+    <img id="qrImg" alt="QR Code Pix" />
+  </div>
 
   <div id="pedidoBox" style="display:none;"></div>
 
@@ -31,16 +34,13 @@
 
   <p class="muted">Se você recebeu este link, basta abrir e escanear o QR Code.</p>
 
-  <!-- Se sua rede bloquear CDNs, troque por Google Charts (te passo a versão) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-
   <script>
     const elPixText = document.getElementById('pixText');
     const btnCopy = document.getElementById('copy');
-    const elQr = document.getElementById('qrcode');
     const elPedidoBox = document.getElementById('pedidoBox');
+    const qrImg = document.getElementById('qrImg');
 
-    // Pedido opcional: ?pedido=...
+    // Pedido opcional
     const params = new URLSearchParams(window.location.search);
     const pedido = (params.get('pedido') || '').trim();
     if (pedido) {
@@ -48,7 +48,7 @@
       elPedidoBox.style.display = 'block';
     }
 
-    // Pix vem no hash como encodeURIComponent(...)
+    // Pix no hash
     const rawHash = (window.location.hash || '').replace(/^#/, '').trim();
 
     if (!rawHash) {
@@ -66,20 +66,16 @@
       if (pix) {
         elPixText.textContent = pix;
 
-        // Gera QR (precisa da lib carregada)
-        if (window.QRCode) {
-          elQr.innerHTML = '';
-          new QRCode(elQr, {
-            text: pix,
-            width: 256,
-            height: 256,
-            correctLevel: QRCode.CorrectLevel.M
-          });
-        } else {
+        // QR via Google Charts
+        const qrUrl =
+          "https://chart.googleapis.com/chart?cht=qr&chs=256x256&chld=M|0&chl=" +
+          encodeURIComponent(pix);
+
+        qrImg.src = qrUrl;
+        qrImg.onerror = () => {
           elPixText.textContent = pix;
-          btnCopy.disabled = false;
-          // Caso a lib não carregue, pelo menos mostra o pix; QR não vai aparecer.
-        }
+          // Se até o Google Charts for bloqueado, o QR não aparece, mas o pix continua copiável.
+        };
 
         btnCopy.addEventListener('click', async () => {
           try {
