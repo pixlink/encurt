@@ -24,6 +24,8 @@
       display:inline-block; padding: 2px 8px; border-radius: 999px;
       border: 1px solid #ddd; font-size: 12px; color:#444; background:#fafafa;
     }
+    .pill.warn { border-color:#f2d58b; background:#fff7df; }
+    .pill.ok { border-color:#b7e0c2; background:#eaf8ee; }
   </style>
 </head>
 <body>
@@ -37,19 +39,19 @@
     <input id="pedido" type="text" placeholder="Ex: 2107551226..." />
 
     <div class="row">
-      <button id="gerar" class="primary">Gerar link encurtado</button>
+      <button id="gerar" class="primary">Gerar link</button>
       <button id="copiar" disabled>Copiar link</button>
       <button id="abrir" disabled>Abrir link</button>
     </div>
 
-<div class="hint">
-  O link é gerado pelo seu Worker e encurtado tentando, nesta ordem:
-  <b>whoa.link</b> → <b>v.gd</b> (fallback).<br />
-  Observação: qualquer encurtador pode aplicar bloqueios/avisos dependendo do link.
-</div>
+    <div class="hint">
+      Recomendação: para evitar páginas de anúncio/intermediárias, o botão <b>Abrir link</b> e o
+      campo <b>Link gerado</b> usam sempre a <b>URL interna</b> do seu Worker (sem ads).<br />
+      A URL encurtada (cleanuri/whoa/v.gd) fica disponível em <b>Detalhes</b>.
+    </div>
 
     <div class="out">
-      <label for="link">Link gerado:</label>
+      <label for="link">Link gerado (recomendado):</label>
       <input id="link" class="mono" readonly placeholder="O link aparecerá aqui..." />
       <div id="status" class="status"></div>
 
@@ -57,15 +59,23 @@
         <summary>Detalhes</summary>
         <div style="margin-top:10px; display:grid; gap:10px;">
           <div>
-            <div class="small">URL interna (fallback):</div>
+            <div class="small">URL encurtada (pode ter anúncio dependendo do encurtador):</div>
+            <input id="shortUrl" class="mono" readonly placeholder="-" />
+          </div>
+
+          <div>
+            <div class="small">URL interna (sempre direta):</div>
             <input id="internalUrl" class="mono" readonly placeholder="-" />
           </div>
+
           <div>
             <div class="small">Destino final (targetUrl):</div>
             <input id="targetUrl" class="mono" readonly placeholder="-" />
           </div>
+
           <div class="small">
             Encurtador usado: <span id="providerBadge" class="pill">-</span>
+            <span id="adHint" class="pill warn" style="display:none;">pode abrir com anúncio</span>
           </div>
         </div>
       </details>
@@ -75,11 +85,16 @@
   <script>
     const pixEl = document.getElementById("pix");
     const pedidoEl = document.getElementById("pedido");
+
+    // Campo principal (o que o usuário copia/abre): internalUrl
     const linkEl = document.getElementById("link");
 
+    // Campos de detalhes:
+    const shortUrlEl = document.getElementById("shortUrl");
     const internalUrlEl = document.getElementById("internalUrl");
     const targetUrlEl = document.getElementById("targetUrl");
     const providerBadgeEl = document.getElementById("providerBadge");
+    const adHintEl = document.getElementById("adHint");
 
     const gerarBtn = document.getElementById("gerar");
     const copiarBtn = document.getElementById("copiar");
@@ -103,19 +118,31 @@
       return (pix || "").toString().replace(/\r/g, "").trim();
     }
 
-    function setDetails({ internalUrl = "", targetUrl = "", provider = "", ok = null, error = "" }) {
-      internalUrlEl.value = internalUrl || "-";
-      targetUrlEl.value = targetUrl || "-";
+    function setProviderBadge(provider, shortOk) {
+      providerBadgeEl.textContent = provider || "-";
+      providerBadgeEl.classList.remove("ok", "warn");
 
-      if (provider) providerBadgeEl.textContent = provider;
-      else providerBadgeEl.textContent = "-";
+      if (!provider) return;
 
-      if (ok === false && error) {
-        setStatus(
-          "Link gerado, mas o encurtador falhou e foi usado o fallback (URL interna) se necessário.\n" +
-          "Detalhe: " + error
-        );
-      }
+      // "ok" aqui significa que pelo menos conseguiu encurtar, não que é sem anúncios.
+      if (shortOk) providerBadgeEl.classList.add("ok");
+      else providerBadgeEl.classList.add("warn");
+
+      // Aviso: alguns encurtadores exibem interstitial/anúncio ao clicar
+      const mayShowAds = ["cleanuri.com", "whoa.link", "v.gd"].includes(provider);
+      adHintEl.style.display = mayShowAds ? "inline-block" : "none";
+    }
+
+    function resetUI() {
+      setButtonsEnabled(false);
+      linkEl.value = "";
+      shortUrlEl.value = "-";
+      internalUrlEl.value = "-";
+      targetUrlEl.value = "-";
+      providerBadgeEl.textContent = "-";
+      providerBadgeEl.classList.remove("ok", "warn");
+      adHintEl.style.display = "none";
+      setStatus("");
     }
 
     gerarBtn.addEventListener("click", async () => {
@@ -127,11 +154,8 @@
         return;
       }
 
-      setButtonsEnabled(false);
-      linkEl.value = "";
-      setDetails({ internalUrl: "", targetUrl: "", provider: "", ok: null, error: "" });
+      resetUI();
       setStatus("Gerando link...");
-
       gerarBtn.disabled = true;
 
       let resp;
@@ -156,9 +180,9 @@
         setStatus("");
         alert("O Worker não retornou JSON. Veja o console (F12).");
         return;
+      } finally {
+        gerarBtn.disabled = false;
       }
-
-      gerarBtn.disabled = false;
 
       if (!resp.ok || !data.ok) {
         setStatus("");
@@ -166,23 +190,28 @@
         return;
       }
 
-      linkEl.value = data.shortUrl || "";
+      // IMPORTANTÍSSIMO:
+      // Para evitar anúncios/intermediários, usamos SEMPRE a URL interna como link "principal".
+      const internalUrl = (data.internalUrl || "").trim();
+      const shortUrl = (data.shortUrl || "").trim();
+
+      linkEl.value = internalUrl || shortUrl || "";
+
+      // Detalhes (para você inspecionar e, se quiser, copiar manualmente)
+      shortUrlEl.value = shortUrl || "-";
+      internalUrlEl.value = internalUrl || "-";
+      targetUrlEl.value = (data.targetUrl || "").trim() || "-";
+      setProviderBadge((data.shortProvider || "").trim(), !!data.shortOk);
+
       setButtonsEnabled(!!linkEl.value);
 
-      setDetails({
-        internalUrl: data.internalUrl || "",
-        targetUrl: data.targetUrl || "",
-        provider: data.shortProvider || "",
-        ok: !!data.shortOk,
-        error: data.shortError || "",
-      });
-
       if (data.shortOk) {
-        setStatus("Link encurtado gerado.");
+        setStatus("Link gerado. (Abrir/Copiar usa a URL interna para evitar anúncios.)");
       } else {
-        if (!data.shortError) {
-          setStatus("Link gerado (fallback). O encurtador não retornou URL curta.");
-        }
+        setStatus(
+          "Link gerado. O encurtador falhou; usando URL interna.\n" +
+          (data.shortError ? ("Detalhe: " + data.shortError) : "")
+        );
       }
     });
 
@@ -199,11 +228,15 @@
     abrirBtn.addEventListener("click", () => {
       const link = (linkEl.value || "").trim();
       if (!link) return;
+
+      // 'noreferrer' ajuda a reduzir interstitial em alguns encurtadores,
+      // mas aqui o link principal é internalUrl (do Worker), então é direto mesmo.
       window.open(link, "_blank", "noopener,noreferrer");
     });
   </script>
 </body>
 </html>
+
 
 
 
