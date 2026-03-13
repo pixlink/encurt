@@ -7,6 +7,7 @@
   <style>
     body { font-family: system-ui, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; text-align: center; }
     #qrcode { display: inline-block; padding: 14px; background: #fff; border: 1px solid #eee; border-radius: 12px; }
+    #pedidoBox { margin-top: 14px; font-size: 16px; font-weight: 600; }
     button { margin-top: 16px; padding: 12px 16px; font-size: 15px; cursor: pointer; }
     .box { margin-top: 18px; text-align: left; background: #f7f7f7; padding: 12px; border-radius: 10px; overflow-wrap: anywhere; }
     .muted { color: #666; font-size: 13px; margin-top: 10px; }
@@ -16,6 +17,8 @@
   <h1>Pagamento via Pix</h1>
 
   <div id="qrcode"></div>
+
+  <div id="pedidoBox" style="display:none;"></div>
 
   <div>
     <button id="copy">Clique para copiar o código copia e cola</button>
@@ -28,21 +31,27 @@
 
   <p class="muted">Se você recebeu este link, basta abrir e escanear o QR Code.</p>
 
-  <!-- Biblioteca QRCode -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script>
     const elPixText = document.getElementById('pixText');
     const btnCopy = document.getElementById('copy');
     const elQr = document.getElementById('qrcode');
+    const elPedidoBox = document.getElementById('pedidoBox');
 
     function base64UrlDecodeToString(b64url) {
-      // base64url -> base64
       let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
-      // pad
       while (b64.length % 4) b64 += '=';
       const binary = atob(b64);
       const bytes = new Uint8Array([...binary].map(ch => ch.charCodeAt(0)));
       return new TextDecoder().decode(bytes);
+    }
+
+    // Lê o número do pedido (opcional) de ?pedido=...
+    const params = new URLSearchParams(window.location.search);
+    const pedido = (params.get('pedido') || '').trim();
+    if (pedido) {
+      elPedidoBox.textContent = `Número do pedido: ${pedido}`;
+      elPedidoBox.style.display = 'block';
     }
 
     const hash = (window.location.hash || '').replace(/^#/, '').trim();
@@ -53,7 +62,7 @@
       let pix = '';
       try {
         pix = base64UrlDecodeToString(hash).trim();
-      } catch (e) {
+      } catch {
         elPixText.textContent = 'Não foi possível ler o Pix a partir do link.';
         btnCopy.disabled = true;
       }
@@ -74,7 +83,6 @@
             btnCopy.textContent = 'Copiado!';
             setTimeout(() => btnCopy.textContent = 'Clique para copiar o código copia e cola', 1200);
           } catch {
-            // fallback
             const ta = document.createElement('textarea');
             ta.value = pix;
             document.body.appendChild(ta);
