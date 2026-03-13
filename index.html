@@ -7,20 +7,21 @@
   <style>
     body { font-family: system-ui, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
     textarea { width: 100%; min-height: 140px; padding: 12px; font-size: 14px; }
+    label { display:block; margin-top: 14px; font-weight: 600; }
+    input[type="text"] { width: 100%; padding: 10px 12px; font-size: 14px; }
     button { padding: 10px 14px; font-size: 14px; cursor: pointer; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-    input[type="text"] { width: 100%; padding: 10px 12px; font-size: 14px; }
     .muted { color: #666; font-size: 13px; }
-    .warn { color: #8a4b00; background: #fff3cd; padding: 10px 12px; border-radius: 10px; margin: 12px 0; display:none; }
   </style>
 </head>
 <body>
   <h1>Gerar link do Pix</h1>
 
-  <div id="warn" class="warn"></div>
-
-  <p>Cole abaixo o seu <b>Pix copia e cola</b> (EMV):</p>
+  <label for="pix">Pix copia e cola</label>
   <textarea id="pix" placeholder="Cole aqui o Pix copia e cola..."></textarea>
+
+  <label for="pedido">Número do pedido (opcional)</label>
+  <input id="pedido" type="text" placeholder="Ex.: 12345" />
 
   <div class="row">
     <button id="gerar">Gerar link público</button>
@@ -29,20 +30,17 @@
 
   <p class="muted">O link vai abrir uma página com QR Code e botão para copiar o Pix.</p>
 
-  <label for="link"><b>Link gerado:</b></label>
+  <label for="link">Link gerado</label>
   <input id="link" type="text" readonly placeholder="O link aparecerá aqui..." />
 
   <script>
+    const GITHUB_PAGES_BASE = "https://brunagill149-jpg.github.io/encurtador-pix/";
+
     const elPix = document.getElementById('pix');
+    const elPedido = document.getElementById('pedido');
     const elLink = document.getElementById('link');
     const btnGerar = document.getElementById('gerar');
     const btnCopiarLink = document.getElementById('copiarLink');
-    const elWarn = document.getElementById('warn');
-
-    function showWarn(msg) {
-      elWarn.textContent = msg;
-      elWarn.style.display = 'block';
-    }
 
     function base64UrlEncode(str) {
       const bytes = new TextEncoder().encode(str);
@@ -52,36 +50,20 @@
       return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
     }
 
-    function getPublicBaseUrl() {
-      const { origin, pathname, protocol } = window.location;
-      if (protocol === 'file:') return null;
-
-      const parts = pathname.split('/').filter(Boolean);
-      if (origin.endsWith('github.io') && parts.length >= 1) {
-        return `${origin}/${parts[0]}/`;
-      }
-
-      const basePath = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
-      return `${origin}${basePath}`;
-    }
-
     btnGerar.addEventListener('click', () => {
-      elWarn.style.display = 'none';
-
       const pix = elPix.value.trim();
+      const pedido = elPedido.value.trim();
+
       if (!pix) {
         alert('Cole o código Pix copia e cola.');
         return;
       }
 
-      const base = getPublicBaseUrl();
-      if (!base) {
-        showWarn('Você está abrindo como arquivo local (file://). Abra pelo GitHub Pages (https://...) para gerar um link público.');
-        return;
-      }
-
       const encoded = base64UrlEncode(pix);
-      const url = new URL('pix.html', base);
+
+      // monta: pix.html?pedido=...#<pix>
+      const url = new URL('pix.html', GITHUB_PAGES_BASE);
+      if (pedido) url.searchParams.set('pedido', pedido);
       url.hash = encoded;
 
       elLink.value = url.toString();
@@ -104,3 +86,4 @@
   </script>
 </body>
 </html>
+
