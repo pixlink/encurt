@@ -42,10 +42,10 @@
   </div>
 
   <script>
-    function baseUrl() {
-      // base do seu GitHub Pages (até a pasta onde estão index.html e pix.html)
-      // Ex.: https://pixlink.github.io/encurtador-pix
-      return location.origin + location.pathname.replace(/\/[^\/]*$/, "");
+    function currentDirBase() {
+      // Se você está em https://pixlink.github.io/encurt/ ou /encurt/index.html
+      // isso retorna https://pixlink.github.io/encurt/
+      return new URL("./", location.href).toString();
     }
 
     const pixEl = document.getElementById("pix");
@@ -62,11 +62,10 @@
         return;
       }
 
-      const url = new URL(baseUrl() + "/pix.html");
+      const url = new URL("pix.html", currentDirBase());
 
       if (pedido) url.searchParams.set("pedido", pedido);
 
-      // Pix vai no hash (não vai para servidor, fica só no browser)
       url.hash = encodeURIComponent(pix);
 
       linkEl.value = url.toString();
