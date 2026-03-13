@@ -14,8 +14,10 @@
     .row { display:flex; gap:12px; align-items:center; margin-top: 14px; flex-wrap:wrap; }
     button { padding: 10px 14px; border-radius: 8px; border:1px solid #111; background:#fff; cursor:pointer; font-weight:700; }
     button.primary { background:#111; color:#fff; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
     .hint { color:#666; font-size: 13px; margin-top: 10px; }
     .out { margin-top: 18px; }
+    .status { margin-top: 10px; font-size: 13px; color:#666; }
   </style>
 </head>
 <body>
@@ -29,78 +31,80 @@
     <input id="pedido" type="text" placeholder="Ex: 2107551226..." />
 
     <div class="row">
-      <button id="gerar" class="primary">Gerar link</button>
+      <button id="gerar" class="primary">Gerar link encurtado</button>
       <button id="copiar" disabled>Copiar link</button>
     </div>
 
-    <div class="hint">O link vai abrir a página com o QR Code e o botão para copiar o Pix.</div>
+    <div class="hint">
+      O link encurtado será gerado pelo Cloudflare Worker e vai abrir a página com o QR Code e o botão para copiar o Pix.
+    </div>
 
     <div class="out">
       <label for="link">Link gerado:</label>
       <input id="link" readonly placeholder="O link aparecerá aqui..." />
+      <div id="status" class="status"></div>
     </div>
   </div>
 
   <script>
-    function currentDirBase() {
-      // Se você está em https://pixlink.github.io/encurt/ ou /encurt/index.html
-      // isso retorna https://pixlink.github.io/encurt/
-      return new URL("./", location.href).toString();
-    }
-
     const pixEl = document.getElementById("pix");
     const pedidoEl = document.getElementById("pedido");
     const linkEl = document.getElementById("link");
     const copiarBtn = document.getElementById("copiar");
+    const statusEl = document.getElementById("status");
+    const gerarBtn = document.getElementById("gerar");
 
-<script>
-  function currentDirBase() {
-    return new URL("./", location.href).toString();
-  }
+    const WORKER_BASE = "https://encurt.pixlink111.workers.dev";
 
-  const pixEl = document.getElementById("pix");
-  const pedidoEl = document.getElementById("pedido");
-  const linkEl = document.getElementById("link");
-  const copiarBtn = document.getElementById("copiar");
-
-  document.getElementById("gerar").addEventListener("click", async () => {
-    const pix = (pixEl.value || "").replace(/\r/g, "").trim();
-    const pedido = (pedidoEl.value || "").trim();
-
-    if (!pix) {
-      alert("Cole o Pix copia e cola.");
-      return;
+    function setStatus(msg) {
+      statusEl.textContent = msg || "";
     }
 
-    // Coloque a URL REAL do seu Worker aqui:
-  const WORKER_BASE = "https://encurt.pixlink111.workers.dev";
+    gerarBtn.addEventListener("click", async () => {
+      const pix = (pixEl.value || "").replace(/\r/g, "").trim();
+      const pedido = (pedidoEl.value || "").trim();
 
-    const resp = await fetch(WORKER_BASE + "/api/shorten", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pix, pedido }),
+      if (!pix) {
+        alert("Cole o Pix copia e cola.");
+        return;
+      }
+
+      copiarBtn.disabled = true;
+      linkEl.value = "";
+      setStatus("Gerando link...");
+
+      let resp;
+      try {
+        resp = await fetch(WORKER_BASE + "/api/shorten", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pix, pedido }),
+        });
+      } catch (e) {
+        setStatus("");
+        alert("Não consegui conectar no encurtador (Worker).");
+        return;
+      }
+
+      let data;
+      try {
+        data = await resp.json();
+      } catch {
+        setStatus("");
+        alert("O Worker não retornou JSON. Veja o console (F12).");
+        return;
+      }
+
+      if (!data.ok) {
+        setStatus("");
+        alert("Erro: " + (data.error || "falha ao encurtar"));
+        return;
+      }
+
+      linkEl.value = data.shortUrl;
+      copiarBtn.disabled = false;
+      setStatus("Link encurtado gerado.");
     });
-
-    const data = await resp.json();
-    if (!data.ok) {
-      alert("Erro: " + (data.error || "falha ao encurtar"));
-      return;
-    }
-
-    linkEl.value = data.shortUrl;
-    copiarBtn.disabled = false;
-  });
-
-  copiarBtn.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(linkEl.value);
-      copiarBtn.textContent = "Copiado!";
-      setTimeout(() => (copiarBtn.textContent = "Copiar link"), 1200);
-    } catch {
-      alert("Não consegui copiar automaticamente. Copie manualmente.");
-    }
-  });
-</script>
 
     copiarBtn.addEventListener("click", async () => {
       try {
