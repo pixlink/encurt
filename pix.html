@@ -3,104 +3,363 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pix - QR Code</title>
+  <title>Pagar com Pix</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; text-align: center; }
-    #qrcode { display: inline-block; padding: 14px; background: #fff; border: 1px solid #eee; border-radius: 12px; min-width: 256px; min-height: 256px; }
-    #pedidoBox { margin-top: 14px; font-size: 16px; font-weight: 600; }
-    button { margin-top: 16px; padding: 12px 16px; font-size: 15px; cursor: pointer; }
-    .box { margin-top: 18px; text-align: left; background: #f7f7f7; padding: 12px; border-radius: 10px; overflow-wrap: anywhere; }
-    .muted { color: #666; font-size: 13px; margin-top: 10px; }
-    .err { margin-top: 10px; color:#b00020; font-size: 13px; }
+    :root{
+      --bg1:#0b1220;
+      --bg2:#111a33;
+      --card:#0f172aee;
+      --stroke:#27324d;
+      --text:#eaf0ff;
+      --muted:#a8b3cf;
+      --accent:#22c55e;
+      --accent2:#60a5fa;
+      --danger:#fb7185;
+      --shadow: 0 18px 60px rgba(0,0,0,.35);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--text);
+      min-height:100vh;
+      background:
+        radial-gradient(900px 500px at 15% 10%, rgba(96,165,250,.25), transparent 60%),
+        radial-gradient(800px 500px at 85% 30%, rgba(34,197,94,.18), transparent 60%),
+        linear-gradient(160deg, var(--bg1), var(--bg2));
+    }
+    .wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 34px 18px 60px;
+    }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom: 18px;
+    }
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    h1{
+      margin:0;
+      font-size: 34px;
+      line-height:1.1;
+      letter-spacing:-0.4px;
+    }
+    .sub{
+      color:var(--muted);
+      font-size: 14px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap:16px;
+      margin-top:16px;
+    }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      backdrop-filter: blur(10px);
+    }
+    .card h2{
+      margin:0 0 10px;
+      font-size: 16px;
+      letter-spacing:.2px;
+      color: #dbe7ff;
+    }
+
+    .chips{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin: 8px 0 2px;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(96,165,250,.10);
+      border: 1px solid rgba(96,165,250,.22);
+      color: #d9e8ff;
+      font-size: 13px;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: var(--accent2);
+      box-shadow: 0 0 0 3px rgba(96,165,250,.12);
+    }
+    .dot.green{ background: var(--accent); box-shadow:0 0 0 3px rgba(34,197,94,.14); }
+
+    .qrBox{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      min-height: 320px;
+    }
+    canvas{ max-width: 100%; height:auto; }
+
+    textarea, input{
+      width:100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(2,6,23,.55);
+      color: var(--text);
+      padding: 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    textarea{ min-height: 120px; resize: vertical; }
+
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top: 12px;
+    }
+    button{
+      appearance:none;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 700;
+      transition: transform .05s ease, background .2s ease, border-color .2s ease;
+    }
+    button:hover{
+      background: rgba(255,255,255,.12);
+      border-color: rgba(255,255,255,.22);
+    }
+    button:active{ transform: translateY(1px); }
+    .primary{
+      background: linear-gradient(135deg, rgba(34,197,94,.95), rgba(96,165,250,.75));
+      border-color: rgba(255,255,255,.18);
+      color:#07121f;
+    }
+    .primary:hover{ filter: brightness(1.03); }
+    .danger{
+      background: rgba(251,113,133,.14);
+      border-color: rgba(251,113,133,.28);
+    }
+
+    .hint{
+      color:var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
+    .msg{
+      margin-top:10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .msg.ok{ color:#b9ffd2; }
+    .msg.err{ color:#ffd1da; }
+
+    footer{
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      opacity:.9;
+    }
+
+    .mini{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      margin-top: 10px;
+    }
+    .linkBack{
+      color:#cfe3ff;
+      text-decoration:none;
+      border-bottom: 1px dashed rgba(207,227,255,.45);
+    }
+    .linkBack:hover{ opacity:.9; }
   </style>
 </head>
 <body>
-  <h1>Pagamento via Pix</h1>
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <h1>Pagar com Pix</h1>
+        <div class="sub">Abra seu app do banco, escaneie o QR Code ou copie o código abaixo.</div>
+        <div class="chips">
+          <span class="chip"><span class="dot green"></span><span id="chipStatus">Pronto</span></span>
+          <span class="chip"><span class="dot"></span><span id="chipPedido">Pedido: —</span></span>
+        </div>
+      </div>
+      <div class="mini">
+        <a class="linkBack" href="./index.html">Gerar outro link</a>
+      </div>
+    </header>
 
-  <div id="qrcode"></div>
+    <div class="grid">
+      <section class="card">
+        <h2>QR Code</h2>
+        <div class="qrBox" id="qrBox">
+          <div class="hint">Carregando QR Code…</div>
+        </div>
+        <div class="hint">
+          Se o QR Code não aparecer, use o botão “Copiar Pix” e cole no app do banco.
+        </div>
+      </section>
 
-  <div id="pedidoBox" style="display:none;"></div>
+      <section class="card">
+        <h2>Código Pix (copia e cola)</h2>
+        <textarea id="pix" readonly placeholder="O Pix aparecerá aqui..."></textarea>
 
-  <div>
-    <button id="copy">Clique para copiar o código copia e cola</button>
+        <div class="row">
+          <button id="copiar" class="primary">Copiar Pix</button>
+          <button id="share">Compartilhar</button>
+          <button id="limpar" class="danger" title="Remove o Pix do campo (não altera o link)">Limpar</button>
+        </div>
+
+        <div id="msg" class="msg"></div>
+
+        <footer>
+          Dica: se você recebeu este link de um vendedor, sempre confira os dados no app do banco antes de pagar.
+        </footer>
+      </section>
+    </div>
   </div>
 
-  <div class="box">
-    <b>Código copia e cola:</b>
-    <div id="pixText" style="margin-top:8px;"></div>
-  </div>
-
-  <div id="status" class="err"></div>
-
-  <p class="muted">Se você recebeu este link, basta abrir e escanear o QR Code.</p>
-
-  <!-- Biblioteca LOCAL (adicione no repo em vendor/qrcode.min.js) -->
-  <script src="./vendor/qrcode.min.js"></script>
+  <!-- QRCode.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 
   <script>
-    const elPixText = document.getElementById('pixText');
-    const btnCopy = document.getElementById('copy');
-    const elPedidoBox = document.getElementById('pedidoBox');
-    const elQr = document.getElementById('qrcode');
-    const statusEl = document.getElementById('status');
+    const pixEl = document.getElementById("pix");
+    const msgEl = document.getElementById("msg");
+    const chipPedidoEl = document.getElementById("chipPedido");
+    const chipStatusEl = document.getElementById("chipStatus");
+    const qrBox = document.getElementById("qrBox");
 
-    // Pedido opcional
-    const params = new URLSearchParams(window.location.search);
-    const pedido = (params.get('pedido') || '').trim();
-    if (pedido) {
-      elPedidoBox.textContent = `Número do pedido: ${pedido}`;
-      elPedidoBox.style.display = 'block';
+    const copiarBtn = document.getElementById("copiar");
+    const shareBtn = document.getElementById("share");
+    const limparBtn = document.getElementById("limpar");
+
+    function setMsg(text, kind) {
+      msgEl.textContent = text || "";
+      msgEl.className = "msg" + (kind ? (" " + kind) : "");
     }
 
-    // Pix no hash (gerado pelo index.html com encodeURIComponent)
-    const rawHash = (window.location.hash || '').replace(/^#/, '').trim();
+    function getPixFromHash() {
+      const h = location.hash || "";
+      if (!h || h === "#") return "";
+      try { return decodeURIComponent(h.slice(1)).trim(); }
+      catch { return h.slice(1).trim(); }
+    }
 
-    if (!rawHash) {
-      elPixText.textContent = 'Nenhum Pix informado na URL.';
-      btnCopy.disabled = true;
-    } else {
-      let pix = '';
+    function getPedidoFromQuery() {
+      const url = new URL(location.href);
+      return (url.searchParams.get("pedido") || "").trim();
+    }
+
+    async function renderQr(pix) {
+      qrBox.innerHTML = "";
+      if (!pix) {
+        qrBox.innerHTML = '<div class="hint">Pix não encontrado no link.</div>';
+        chipStatusEl.textContent = "Erro";
+        return;
+      }
+      chipStatusEl.textContent = "Pronto";
+      const canvas = document.createElement("canvas");
+      qrBox.appendChild(canvas);
+
+      // Ajusta tamanho do QR dependendo da tela
+      const size = Math.min(360, Math.max(240, Math.floor(window.innerWidth * 0.72)));
       try {
-        pix = decodeURIComponent(rawHash).trim();
-      } catch {
-        elPixText.textContent = 'Não foi possível ler o Pix a partir do link.';
-        btnCopy.disabled = true;
-      }
-
-      if (pix) {
-        elPixText.textContent = pix;
-
-        if (!window.QRCode) {
-          statusEl.textContent = "Biblioteca local de QR não carregou. Verifique se existe ./vendor/qrcode.min.js";
-        } else {
-          elQr.innerHTML = "";
-          new QRCode(elQr, {
-            text: pix,
-            width: 256,
-            height: 256,
-            correctLevel: QRCode.CorrectLevel.M
-          });
-        }
-
-        btnCopy.addEventListener('click', async () => {
-          try {
-            await navigator.clipboard.writeText(pix);
-            btnCopy.textContent = 'Copiado!';
-            setTimeout(() => btnCopy.textContent = 'Clique para copiar o código copia e cola', 1200);
-          } catch {
-            const ta = document.createElement('textarea');
-            ta.value = pix;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            btnCopy.textContent = 'Copiado!';
-            setTimeout(() => btnCopy.textContent = 'Clique para copiar o código copia e cola', 1200);
-          }
+        await QRCode.toCanvas(canvas, pix, {
+          width: size,
+          margin: 2,
+          errorCorrectionLevel: "M",
+          color: { dark: "#0b1220", light: "#ffffff" },
         });
+      } catch (e) {
+        qrBox.innerHTML = '<div class="hint">Não consegui gerar o QR Code.</div>';
+        chipStatusEl.textContent = "Erro";
       }
     }
+
+    async function copyPix() {
+      const pix = (pixEl.value || "").trim();
+      if (!pix) {
+        setMsg("Nada para copiar.", "err");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(pix);
+        setMsg("Pix copiado. Agora cole no app do banco.", "ok");
+      } catch {
+        // fallback
+        pixEl.focus();
+        pixEl.select();
+        setMsg("Não consegui copiar automaticamente. Selecione e copie manualmente.", "err");
+      }
+    }
+
+    async function shareLink() {
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: "Pagamento Pix", url: location.href });
+          setMsg("Link compartilhado.", "ok");
+        } else {
+          await navigator.clipboard.writeText(location.href);
+          setMsg("Seu navegador não tem 'Compartilhar'. Copiei o link para você.", "ok");
+        }
+      } catch {
+        setMsg("Não consegui compartilhar agora.", "err");
+      }
+    }
+
+    function clearPixField() {
+      pixEl.value = "";
+      setMsg("Campo limpo (o link continua o mesmo).", "");
+    }
+
+    // init
+    const pedido = getPedidoFromQuery();
+    chipPedidoEl.textContent = pedido ? ("Pedido: " + pedido) : "Pedido: —";
+
+    const pix = getPixFromHash();
+    pixEl.value = pix;
+
+    renderQr(pix);
+
+    copiarBtn.addEventListener("click", copyPix);
+    shareBtn.addEventListener("click", shareLink);
+    limparBtn.addEventListener("click", clearPixField);
+
+    // se o usuário redimensionar a tela, re-renderiza o QR com tamanho melhor
+    let t;
+    window.addEventListener("resize", () => {
+      clearTimeout(t);
+      t = setTimeout(() => renderQr(getPixFromHash()), 200);
+    });
   </script>
 </body>
 </html>
+
 
