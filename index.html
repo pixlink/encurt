@@ -20,6 +20,10 @@
     .status { margin-top: 10px; font-size: 13px; color:#666; white-space: pre-wrap; }
     .small { font-size: 12px; color: #666; margin-top: 8px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .pill {
+      display:inline-block; padding: 2px 8px; border-radius: 999px;
+      border: 1px solid #ddd; font-size: 12px; color:#444; background:#fafafa;
+    }
   </style>
 </head>
 <body>
@@ -33,13 +37,13 @@
     <input id="pedido" type="text" placeholder="Ex: 2107551226..." />
 
     <div class="row">
-      <button id="gerar" class="primary">Gerar link encurtado (v.gd)</button>
+      <button id="gerar" class="primary">Gerar link encurtado</button>
       <button id="copiar" disabled>Copiar link</button>
       <button id="abrir" disabled>Abrir link</button>
     </div>
 
     <div class="hint">
-      Este modo usa apenas o <b>v.gd</b> (sem Cloudflare).<br/>
+      O link encurtado é gerado pelo seu Worker e encurtado no <b>v.gd</b> (do lado do servidor, sem CORS).<br />
       Observação: o v.gd pode mostrar uma página de aviso antes de redirecionar — isso é controlado pelo próprio v.gd.
     </div>
 
@@ -49,9 +53,19 @@
       <div id="status" class="status"></div>
 
       <details class="small" style="margin-top:12px;">
-        <summary>Ver URL de destino (antes de encurtar)</summary>
-        <div style="margin-top:8px;">
-          <input id="destino" class="mono" readonly placeholder="Destino aparecerá aqui..." />
+        <summary>Detalhes</summary>
+        <div style="margin-top:10px; display:grid; gap:10px;">
+          <div>
+            <div class="small">URL interna (fallback):</div>
+            <input id="internalUrl" class="mono" readonly placeholder="-" />
+          </div>
+          <div>
+            <div class="small">Destino final (targetUrl):</div>
+            <input id="targetUrl" class="mono" readonly placeholder="-" />
+          </div>
+          <div class="small">
+            Status v.gd: <span id="vgdBadge" class="pill">-</span>
+          </div>
         </div>
       </details>
     </div>
@@ -61,7 +75,10 @@
     const pixEl = document.getElementById("pix");
     const pedidoEl = document.getElementById("pedido");
     const linkEl = document.getElementById("link");
-    const destinoEl = document.getElementById("destino");
+
+    const internalUrlEl = document.getElementById("internalUrl");
+    const targetUrlEl = document.getElementById("targetUrl");
+    const vgdBadgeEl = document.getElementById("vgdBadge");
 
     const gerarBtn = document.getElementById("gerar");
     const copiarBtn = document.getElementById("copiar");
@@ -69,8 +86,8 @@
 
     const statusEl = document.getElementById("status");
 
-    // Página final (seu site)
-    const PIX_PAGE = "https://pixlink.github.io/encurt/pix.html";
+    // URL do seu Cloudflare Worker (sem barra no final)
+    const WORKER_BASE = "https://encurt.pixlink111.workers.dev";
 
     function setStatus(msg) {
       statusEl.textContent = msg || "";
@@ -82,37 +99,25 @@
     }
 
     function normalizePix(pix) {
-      // remove \r e trim (não mexe no conteúdo do EMV além disso)
       return (pix || "").toString().replace(/\r/g, "").trim();
     }
 
-    function buildTargetUrl({ pix, pedido }) {
-      const pedidoClean = (pedido || "").toString().trim();
-      const pedidoPart = pedidoClean ? `?pedido=${encodeURIComponent(pedidoClean)}` : "";
-      // pix vai no fragmento (#) como você já usa
-      return `${PIX_PAGE}${pedidoPart}#${encodeURIComponent(pix)}`;
-    }
+    function setDetails({ internalUrl = "", targetUrl = "", vgdOk = null, vgdError = "" }) {
+      internalUrlEl.value = internalUrl || "-";
+      targetUrlEl.value = targetUrl || "-";
 
-    async function shortenWithVgd(longUrl) {
-      // API "simple" do v.gd: devolve texto puro com a URL encurtada
-      const api = "https://v.gd/create.php?format=simple&url=" + encodeURIComponent(longUrl);
-
-      // Observação: isso é cross-origin; geralmente funciona porque v.gd libera.
-      const resp = await fetch(api, { method: "GET" });
-
-      const text = (await resp.text()).trim();
-
-      if (!resp.ok) {
-        // às vezes eles retornam 200 com erro em texto, então tratamos nos dois jeitos
-        throw new Error(text || `HTTP ${resp.status}`);
+      if (vgdOk === true) {
+        vgdBadgeEl.textContent = "OK";
+      } else if (vgdOk === false) {
+        vgdBadgeEl.textContent = "Falhou";
+      } else {
+        vgdBadgeEl.textContent = "-";
       }
 
-      if (text.startsWith("https://v.gd/") || text.startsWith("http://v.gd/")) {
-        return text;
+      // mostra erro no status (sem popup) se tiver
+      if (vgdOk === false && vgdError) {
+        setStatus("Link gerado, mas o v.gd falhou. Use o fallback (URL interna) se necessário.\nDetalhe v.gd: " + vgdError);
       }
-
-      // quando dá erro, ele costuma devolver uma mensagem em texto
-      throw new Error(text || "Resposta inesperada do v.gd");
     }
 
     gerarBtn.addEventListener("click", async () => {
@@ -126,25 +131,60 @@
 
       setButtonsEnabled(false);
       linkEl.value = "";
-      destinoEl.value = "";
-      setStatus("Montando URL de destino...");
+      setDetails({ internalUrl: "", targetUrl: "", vgdOk: null, vgdError: "" });
+      setStatus("Gerando link...");
 
-      const targetUrl = buildTargetUrl({ pix, pedido });
-      destinoEl.value = targetUrl;
-
-      setStatus("Encurtando no v.gd...");
       gerarBtn.disabled = true;
 
+      let resp;
       try {
-        const shortUrl = await shortenWithVgd(targetUrl);
-        linkEl.value = shortUrl;
-        setButtonsEnabled(true);
-        setStatus("Link encurtado gerado.");
+        resp = await fetch(WORKER_BASE + "/api/shorten", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pix, pedido }),
+        });
       } catch (e) {
-        setStatus("Falha ao encurtar no v.gd.\n\nDetalhe: " + (e?.message || e));
-        alert("Não consegui encurtar no v.gd. Veja o detalhe abaixo do campo.");
-      } finally {
         gerarBtn.disabled = false;
+        setStatus("");
+        alert("Não consegui conectar no Worker.");
+        return;
+      }
+
+      let data;
+      try {
+        data = await resp.json();
+      } catch {
+        gerarBtn.disabled = false;
+        setStatus("");
+        alert("O Worker não retornou JSON. Veja o console (F12).");
+        return;
+      }
+
+      gerarBtn.disabled = false;
+
+      if (!resp.ok || !data.ok) {
+        setStatus("");
+        alert("Erro: " + (data.error || `HTTP ${resp.status}`));
+        return;
+      }
+
+      linkEl.value = data.shortUrl || "";
+      setButtonsEnabled(!!linkEl.value);
+
+      setDetails({
+        internalUrl: data.internalUrl || "",
+        targetUrl: data.targetUrl || "",
+        vgdOk: !!data.vgdOk,
+        vgdError: data.vgdError || "",
+      });
+
+      if (data.vgdOk) {
+        setStatus("Link encurtado gerado.");
+      } else {
+        // status já foi setado em setDetails, mas se não veio erro:
+        if (!data.vgdError) {
+          setStatus("Link gerado (fallback). O v.gd não retornou URL curta.");
+        }
       }
     });
 
@@ -166,6 +206,7 @@
   </script>
 </body>
 </html>
+
 
 
 
