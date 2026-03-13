@@ -44,7 +44,7 @@
 
     <div class="hint">
       O link é gerado pelo seu Worker e encurtado tentando, nesta ordem:
-      <b>cleanuri.com</b> → <b>whoa.link</b> → <b>v.gd</b> (fallback).<br />
+      <b>whoa.link</b> → <b>clck.ru</b> (fallback).<br />
       Observação: qualquer encurtador pode aplicar bloqueios/avisos dependendo do link.
     </div>
 
@@ -165,8 +165,6 @@
         return;
       }
 
-      // DO JEITO ANTIGO:
-      // Campo principal usa SEMPRE o shortUrl (encurtado). Se falhar, vem o internalUrl como fallback do Worker.
       linkEl.value = data.shortUrl || "";
       setButtonsEnabled(!!linkEl.value);
 
@@ -200,9 +198,6 @@
     abrirBtn.addEventListener("click", () => {
       const link = (linkEl.value || "").trim();
       if (!link) return;
-
-      // Mantém como você já estava usando.
-      // Pode reduzir referer em alguns casos, mas não impede anúncios do encurtador.
       window.open(link, "_blank", "noopener,noreferrer");
     });
   </script>
