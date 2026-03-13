@@ -33,6 +33,7 @@
     <div class="row">
       <button id="gerar" class="primary">Gerar link encurtado</button>
       <button id="copiar" disabled>Copiar link</button>
+      <button id="abrir" disabled>Abrir link</button>
     </div>
 
     <div class="hint">
@@ -50,14 +51,23 @@
     const pixEl = document.getElementById("pix");
     const pedidoEl = document.getElementById("pedido");
     const linkEl = document.getElementById("link");
-    const copiarBtn = document.getElementById("copiar");
-    const statusEl = document.getElementById("status");
-    const gerarBtn = document.getElementById("gerar");
 
+    const gerarBtn = document.getElementById("gerar");
+    const copiarBtn = document.getElementById("copiar");
+    const abrirBtn = document.getElementById("abrir");
+
+    const statusEl = document.getElementById("status");
+
+    // URL do seu Cloudflare Worker (sem barra no final)
     const WORKER_BASE = "https://encurt.pixlink111.workers.dev";
 
     function setStatus(msg) {
       statusEl.textContent = msg || "";
+    }
+
+    function setButtonsEnabled(enabled) {
+      copiarBtn.disabled = !enabled;
+      abrirBtn.disabled = !enabled;
     }
 
     gerarBtn.addEventListener("click", async () => {
@@ -69,7 +79,7 @@
         return;
       }
 
-      copiarBtn.disabled = true;
+      setButtonsEnabled(false);
       linkEl.value = "";
       setStatus("Gerando link...");
 
@@ -80,7 +90,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pix, pedido }),
         });
-      } catch (e) {
+      } catch {
         setStatus("");
         alert("Não consegui conectar no encurtador (Worker).");
         return;
@@ -102,7 +112,7 @@
       }
 
       linkEl.value = data.shortUrl;
-      copiarBtn.disabled = false;
+      setButtonsEnabled(true);
       setStatus("Link encurtado gerado.");
     });
 
@@ -115,7 +125,14 @@
         alert("Não consegui copiar automaticamente. Copie manualmente.");
       }
     });
+
+    abrirBtn.addEventListener("click", () => {
+      const link = (linkEl.value || "").trim();
+      if (!link) return;
+      window.open(link, "_blank", "noopener,noreferrer");
+    });
   </script>
 </body>
 </html>
+
 
