@@ -53,24 +53,54 @@
     const linkEl = document.getElementById("link");
     const copiarBtn = document.getElementById("copiar");
 
-    document.getElementById("gerar").addEventListener("click", () => {
-      const pix = (pixEl.value || "").trim();
-      const pedido = (pedidoEl.value || "").trim();
+<script>
+  function currentDirBase() {
+    return new URL("./", location.href).toString();
+  }
 
-      if (!pix) {
-        alert("Cole o Pix copia e cola.");
-        return;
-      }
+  const pixEl = document.getElementById("pix");
+  const pedidoEl = document.getElementById("pedido");
+  const linkEl = document.getElementById("link");
+  const copiarBtn = document.getElementById("copiar");
 
-      const url = new URL("pix.html", currentDirBase());
+  document.getElementById("gerar").addEventListener("click", async () => {
+    const pix = (pixEl.value || "").replace(/\r/g, "").trim();
+    const pedido = (pedidoEl.value || "").trim();
 
-      if (pedido) url.searchParams.set("pedido", pedido);
+    if (!pix) {
+      alert("Cole o Pix copia e cola.");
+      return;
+    }
 
-      url.hash = encodeURIComponent(pix);
+    // Coloque a URL REAL do seu Worker aqui:
+  const WORKER_BASE = "https://encurt.pixlink111.workers.dev";
 
-      linkEl.value = url.toString();
-      copiarBtn.disabled = false;
+    const resp = await fetch(WORKER_BASE + "/api/shorten", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pix, pedido }),
     });
+
+    const data = await resp.json();
+    if (!data.ok) {
+      alert("Erro: " + (data.error || "falha ao encurtar"));
+      return;
+    }
+
+    linkEl.value = data.shortUrl;
+    copiarBtn.disabled = false;
+  });
+
+  copiarBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(linkEl.value);
+      copiarBtn.textContent = "Copiado!";
+      setTimeout(() => (copiarBtn.textContent = "Copiar link"), 1200);
+    } catch {
+      alert("Não consegui copiar automaticamente. Copie manualmente.");
+    }
+  });
+</script>
 
     copiarBtn.addEventListener("click", async () => {
       try {
@@ -84,3 +114,4 @@
   </script>
 </body>
 </html>
+
