@@ -43,8 +43,9 @@
     </div>
 
     <div class="hint">
-      O link encurtado é gerado pelo seu Worker e encurtado no <b>v.gd</b> (do lado do servidor, sem CORS).<br />
-      Observação: o v.gd pode mostrar uma página de aviso antes de redirecionar — isso é controlado pelo próprio v.gd.
+      O link é gerado pelo seu Worker e encurtado tentando, nesta ordem:
+      <b>whoa.link</b> → <b>is.gd</b> → <b>v.gd</b> (fallback).<br />
+      Observação: qualquer encurtador pode aplicar bloqueios/avisos dependendo do link.
     </div>
 
     <div class="out">
@@ -64,7 +65,7 @@
             <input id="targetUrl" class="mono" readonly placeholder="-" />
           </div>
           <div class="small">
-            Status v.gd: <span id="vgdBadge" class="pill">-</span>
+            Encurtador usado: <span id="providerBadge" class="pill">-</span>
           </div>
         </div>
       </details>
@@ -78,7 +79,7 @@
 
     const internalUrlEl = document.getElementById("internalUrl");
     const targetUrlEl = document.getElementById("targetUrl");
-    const vgdBadgeEl = document.getElementById("vgdBadge");
+    const providerBadgeEl = document.getElementById("providerBadge");
 
     const gerarBtn = document.getElementById("gerar");
     const copiarBtn = document.getElementById("copiar");
@@ -102,21 +103,18 @@
       return (pix || "").toString().replace(/\r/g, "").trim();
     }
 
-    function setDetails({ internalUrl = "", targetUrl = "", vgdOk = null, vgdError = "" }) {
+    function setDetails({ internalUrl = "", targetUrl = "", provider = "", ok = null, error = "" }) {
       internalUrlEl.value = internalUrl || "-";
       targetUrlEl.value = targetUrl || "-";
 
-      if (vgdOk === true) {
-        vgdBadgeEl.textContent = "OK";
-      } else if (vgdOk === false) {
-        vgdBadgeEl.textContent = "Falhou";
-      } else {
-        vgdBadgeEl.textContent = "-";
-      }
+      if (provider) providerBadgeEl.textContent = provider;
+      else providerBadgeEl.textContent = "-";
 
-      // mostra erro no status (sem popup) se tiver
-      if (vgdOk === false && vgdError) {
-        setStatus("Link gerado, mas o v.gd falhou. Use o fallback (URL interna) se necessário.\nDetalhe v.gd: " + vgdError);
+      if (ok === false && error) {
+        setStatus(
+          "Link gerado, mas o encurtador falhou e foi usado o fallback (URL interna) se necessário.\n" +
+          "Detalhe: " + error
+        );
       }
     }
 
@@ -131,7 +129,7 @@
 
       setButtonsEnabled(false);
       linkEl.value = "";
-      setDetails({ internalUrl: "", targetUrl: "", vgdOk: null, vgdError: "" });
+      setDetails({ internalUrl: "", targetUrl: "", provider: "", ok: null, error: "" });
       setStatus("Gerando link...");
 
       gerarBtn.disabled = true;
@@ -174,16 +172,16 @@
       setDetails({
         internalUrl: data.internalUrl || "",
         targetUrl: data.targetUrl || "",
-        vgdOk: !!data.vgdOk,
-        vgdError: data.vgdError || "",
+        provider: data.shortProvider || "",
+        ok: !!data.shortOk,
+        error: data.shortError || "",
       });
 
-      if (data.vgdOk) {
+      if (data.shortOk) {
         setStatus("Link encurtado gerado.");
       } else {
-        // status já foi setado em setDetails, mas se não veio erro:
-        if (!data.vgdError) {
-          setStatus("Link gerado (fallback). O v.gd não retornou URL curta.");
+        if (!data.shortError) {
+          setStatus("Link gerado (fallback). O encurtador não retornou URL curta.");
         }
       }
     });
@@ -206,6 +204,7 @@
   </script>
 </body>
 </html>
+
 
 
 
