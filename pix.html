@@ -68,10 +68,11 @@
 
     header{
       display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
+      flex-direction: column;
+      gap: 8px;
       margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
     }
     h1{
       margin:0;
@@ -79,20 +80,11 @@
       letter-spacing:-.2px;
     }
     .sub{
-      margin-top: 6px;
+      margin: 0;
       color: var(--muted);
       font-size: 13px;
       line-height: 1.35;
     }
-    .back{
-      color:#eafff3;
-      text-decoration:none;
-      font-size: 13px;
-      border-bottom: 1px dashed rgba(234,255,243,.55);
-      white-space:nowrap;
-      margin-top: 6px;
-    }
-    .back:hover{ opacity:.9; }
 
     .qrBox{
       margin-top: 14px;
@@ -103,6 +95,8 @@
       border-radius: 16px;
       background: rgba(255,255,255,.08);
       border: 1px solid rgba(134,239,172,.22);
+      position: relative;
+      z-index: 1;
     }
     canvas{
       display:block;
@@ -119,6 +113,8 @@
       text-align:center;
       font-size: 14px;
       color: var(--muted);
+      position: relative;
+      z-index: 1;
     }
     .pedido strong{
       color: var(--text);
@@ -138,6 +134,8 @@
       min-height: 110px;
       resize: vertical;
       word-break: break-word;
+      position: relative;
+      z-index: 1;
     }
 
     .row{
@@ -147,6 +145,8 @@
       justify-content:center;
       flex-wrap:wrap;
       margin-top: 12px;
+      position: relative;
+      z-index: 1;
     }
     button{
       appearance:none;
@@ -175,6 +175,8 @@
       font-size: 13px;
       color: var(--muted);
       min-height: 18px;
+      position: relative;
+      z-index: 1;
     }
     .msg.ok{ color: #eafff3; }
     .msg.err{ color: #ffd1da; }
@@ -186,6 +188,8 @@
       font-size: 12px;
       line-height: 1.35;
       opacity: .95;
+      position: relative;
+      z-index: 1;
     }
   </style>
 </head>
@@ -193,11 +197,8 @@
   <div class="wrap">
     <main class="card">
       <header>
-        <div>
-          <h1>Pagar com Pix</h1>
-          <div class="sub">Escaneie o QR Code ou copie o Pix abaixo.</div>
-        </div>
-        <a class="back" href="./index.html">Gerar outro link</a>
+        <h1>Pagar com Pix</h1>
+        <p class="sub">Escaneie o QR Code ou copie o Pix abaixo.</p>
       </header>
 
       <section class="qrBox" id="qrBox">
